@@ -1,0 +1,71 @@
+{
+  "tavern": {
+    "name": "酒馆",
+    "description": "招募英雄的地方",
+    "levels": [
+      {
+        "level": 1,
+        "heroes_available": 2,
+        "refresh_cost": 10,
+        "build_cost": {"gold": 50, "wood": 20}
+      },
+      {
+        "level": 2,
+        "heroes_available": 3,
+        "refresh_cost": 8,
+        "build_cost": {"gold": 100, "wood": 40, "stone": 20}
+      },
+      {
+        "level": 3,
+        "heroes_available": 4,
+        "refresh_cost": 5,
+        "build_cost": {"gold": 200, "wood": 80, "stone": 40, "crystal": 10}
+      }
+    ]
+  },
+  "barracks": {
+    "name": "兵营",
+    "description": "招募士兵的地方",
+    "levels": [
+      {
+        "level": 1,
+        "troops_per_recruit": 5,
+        "recruit_cost": 5,
+        "build_cost": {"gold": 40, "wood": 30}
+      },
+      {
+        "level": 2,
+        "troops_per_recruit": 10,
+        "recruit_cost": 4,
+        "build_cost": {"gold": 80, "wood": 50, "stone": 30}
+      },
+      {
+        "level": 3,
+        "troops_per_recruit": 15,
+        "recruit_cost": 3,
+        "build_cost": {"gold": 160, "wood": 100, "stone": 60, "crystal": 5}
+      }
+    ]
+  },
+  "blacksmith": {
+    "name": "铁匠铺",
+    "description": "打造装备的地方",
+    "levels": [
+      {
+        "level": 1,
+        "equipment_tier": 1,
+        "build_cost": {"gold": 60, "wood": 20, "stone": 15}
+      },
+      {
+        "level": 2,
+        "equipment_tier": 2,
+        "build_cost": {"gold": 120, "wood": 40, "stone": 30}
+      },
+      {
+        "level": 3,
+        "equipment_tier": 3,
+        "build_cost": {"gold": 240, "wood": 80, "stone": 60, "crystal": 15}
+      }
+    ]
+  }
+}

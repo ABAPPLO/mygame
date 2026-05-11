@@ -1,0 +1,62 @@
+{
+  "weapons": [
+    {
+      "id": "sword_01",
+      "name": "铁剑",
+      "type": "weapon",
+      "stats": {"atk": 5},
+      "cost": 20,
+      "description": "普通的铁制长剑"
+    },
+    {
+      "id": "sword_02",
+      "name": "精钢剑",
+      "type": "weapon",
+      "stats": {"atk": 10},
+      "cost": 50,
+      "description": "精钢锻造的利剑"
+    },
+    {
+      "id": "staff_01",
+      "name": "学徒法杖",
+      "type": "weapon",
+      "stats": {"magic": 8},
+      "cost": 25,
+      "description": "适合初学者的法杖"
+    },
+    {
+      "id": "bow_01",
+      "name": "猎弓",
+      "type": "weapon",
+      "stats": {"atk": 4, "spd": 2},
+      "cost": 18,
+      "description": "轻便的猎弓"
+    }
+  ],
+  "armors": [
+    {
+      "id": "armor_01",
+      "name": "皮甲",
+      "type": "armor",
+      "stats": {"def": 5},
+      "cost": 15,
+      "description": "基础皮甲，提供少量防护"
+    },
+    {
+      "id": "armor_02",
+      "name": "锁子甲",
+      "type": "armor",
+      "stats": {"def": 10},
+      "cost": 40,
+      "description": "精良的锁子甲"
+    },
+    {
+      "id": "robe_01",
+      "name": "法师长袍",
+      "type": "armor",
+      "stats": {"def": 2, "magic": 5},
+      "cost": 20,
+      "description": "附有魔力的长袍"
+    }
+  ]
+}

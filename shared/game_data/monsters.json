@@ -1,0 +1,43 @@
+[
+  {
+    "id": "slime",
+    "name": "史莱姆",
+    "stats": {"hp": 30, "atk": 5, "def": 2, "spd": 3},
+    "loot": {"gold": 5, "exp": 10},
+    "behavior": "passive",
+    "description": "最弱的怪物，不会主动攻击"
+  },
+  {
+    "id": "goblin",
+    "name": "哥布林",
+    "stats": {"hp": 50, "atk": 10, "def": 4, "spd": 8},
+    "loot": {"gold": 10, "exp": 20},
+    "behavior": "aggressive",
+    "description": "小型绿皮怪物，会主动攻击"
+  },
+  {
+    "id": "wolf",
+    "name": "灰狼",
+    "stats": {"hp": 60, "atk": 14, "def": 5, "spd": 12},
+    "loot": {"gold": 8, "exp": 25},
+    "behavior": "pack",
+    "description": "群体行动的灰狼，速度很快"
+  },
+  {
+    "id": "skeleton",
+    "name": "骷髅战士",
+    "stats": {"hp": 80, "atk": 16, "def": 10, "spd": 5},
+    "loot": {"gold": 15, "exp": 35},
+    "behavior": "aggressive",
+    "description": "不死生物，攻防均衡"
+  },
+  {
+    "id": "boss_ogre",
+    "name": "食人魔首领",
+    "stats": {"hp": 200, "atk": 25, "def": 15, "spd": 4},
+    "loot": {"gold": 50, "exp": 100},
+    "behavior": "boss",
+    "description": "巨大的食人魔，极强的攻击力",
+    "is_boss": true
+  }
+]

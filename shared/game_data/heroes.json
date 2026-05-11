@@ -1,0 +1,91 @@
+[
+  {
+    "id": "hero_warrior",
+    "name": "艾瑞克",
+    "class": "战士",
+    "personality": "勇敢鲁莽，喜欢正面交锋，不轻易撤退",
+    "base_stats": {
+      "hp": 120,
+      "atk": 18,
+      "def": 12,
+      "spd": 6
+    },
+    "talent": {
+      "id": "offense",
+      "name": "进攻术",
+      "description": "增加10%物理伤害"
+    },
+    "skills": [
+      {
+        "id": "heavy_strike",
+        "name": "重击",
+        "description": "对单个敌人造成大量伤害",
+        "damage_multiplier": 2.0,
+        "cooldown": 5,
+        "type": "offensive"
+      }
+    ],
+    "troops_base": 10,
+    "troops_max": 30
+  },
+  {
+    "id": "hero_mage",
+    "name": "莉娜",
+    "class": "法师",
+    "personality": "冷静谨慎，喜欢保持距离用魔法攻击，优先攻击弱者",
+    "base_stats": {
+      "hp": 80,
+      "atk": 8,
+      "def": 5,
+      "spd": 10,
+      "magic": 25
+    },
+    "talent": {
+      "id": "arcane",
+      "name": "奥术精通",
+      "description": "魔法伤害增加15%"
+    },
+    "skills": [
+      {
+        "id": "fireball",
+        "name": "火球术",
+        "description": "对所有敌人造成范围魔法伤害",
+        "damage_multiplier": 1.5,
+        "cooldown": 4,
+        "type": "magical_aoe"
+      }
+    ],
+    "troops_base": 5,
+    "troops_max": 15
+  },
+  {
+    "id": "hero_ranger",
+    "name": "席尔瓦",
+    "class": "游侠",
+    "personality": "机智灵活，善于观察战场，优先攻击威胁最大的目标",
+    "base_stats": {
+      "hp": 90,
+      "atk": 14,
+      "def": 7,
+      "spd": 14
+    },
+    "talent": {
+      "id": "leadership",
+      "name": "领导力",
+      "description": "带兵上限+10"
+    },
+    "skills": [
+      {
+        "id": "multishot",
+        "name": "多重射击",
+        "description": "对最多3个敌人各造成一次伤害",
+        "damage_multiplier": 0.8,
+        "cooldown": 4,
+        "targets": 3,
+        "type": "offensive_multi"
+      }
+    ],
+    "troops_base": 8,
+    "troops_max": 25
+  }
+]
