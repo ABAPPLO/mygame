@@ -13,6 +13,14 @@ var building_levels: Dictionary = {
 	"blacksmith": 1,
 }
 
+# Battle context: passed from map to battle scene
+var pending_battle: Dictionary = {}
+# After battle, store result for map to read
+var last_battle_result: Dictionary = {}
+
+# Map state: cached across scene changes so progress isn't lost
+var map_cache: Dictionary = {}
+
 func change_state(new_state: GameState):
 	current_state = new_state
 	state_changed.emit(new_state)
@@ -26,6 +34,25 @@ func change_state(new_state: GameState):
 			get_tree().change_scene_to_file("res://scenes/world_map.tscn")
 		GameState.BATTLE:
 			get_tree().change_scene_to_file("res://scenes/battle.tscn")
+
+func start_battle(hero_id: String, enemy_list: Array):
+	pending_battle = {
+		"hero_id": hero_id,
+		"enemies": enemy_list,
+	}
+	change_state(GameState.BATTLE)
+
+func has_map_cache() -> bool:
+	return map_cache.has("seed")
+
+func save_map_state(data: Dictionary):
+	map_cache = data
+
+func get_map_cache() -> Dictionary:
+	return map_cache
+
+func clear_map_cache():
+	map_cache = {}
 
 func add_hero(hero_data: Dictionary) -> bool:
 	if heroes.size() >= max_heroes:
@@ -72,23 +99,17 @@ func add_exp_to_hero(hero_id: String, amount: int):
 				h.stats.hp = int(h.stats.hp * 1.1)
 				h.max_hp = h.stats.hp
 				h.stats.atk = int(h.stats.atk * 1.1)
-				h.stats.defense = int(h.stats.get("def", 5) * 1.1)
+				var def_key = "def" if h.stats.has("def") else "defense"
+				h.stats[def_key] = int(h.stats.get(def_key, 5) * 1.1)
 				h.max_troops += 5
 				exp_needed = h.level * 100
-
-func get_save_data() -> Dictionary:
-	return {
-		"heroes": heroes,
-		"building_levels": building_levels,
-	}
-
-func load_data(data: Dictionary):
-	heroes = data.get("heroes", [])
-	building_levels = data.get("building_levels", {"tavern": 1, "barracks": 1, "blacksmith": 1})
 
 func new_game():
 	heroes.clear()
 	building_levels = {"tavern": 1, "barracks": 1, "blacksmith": 1}
+	pending_battle = {}
+	last_battle_result = {}
+	clear_map_cache()
 	ResourceManager.gold = 100
 	ResourceManager.wood = 50
 	ResourceManager.stone = 30
