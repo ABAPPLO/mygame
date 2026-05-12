@@ -26,7 +26,7 @@ func _build_scene():
 	# Background
 	var bg = ColorRect.new()
 	bg.color = Color(0.08, 0.06, 0.12, 1)
-	bg.position = Vector2(-640, -360)
+	bg.position = Vector2(0, 0)
 	bg.size = Vector2(1280, 720)
 	bg.z_index = -10
 	add_child(bg)
@@ -34,44 +34,44 @@ func _build_scene():
 	# Battle ground
 	var ground = ColorRect.new()
 	ground.color = Color(0.18, 0.22, 0.16, 1)
-	ground.position = Vector2(-500, -80)
+	ground.position = Vector2(140, 180)
 	ground.size = Vector2(1000, 160)
 	add_child(ground)
 
 	# Hero sprite
 	var hero_sprite = ColorRect.new()
 	hero_sprite.color = Color(0.9, 0.2, 0.2)
-	hero_sprite.position = Vector2(-350, -50)
-	hero_sprite.size = Vector2(50, 70)
+	hero_sprite.position = Vector2(220, 200)
+	hero_sprite.size = Vector2(60, 80)
 	add_child(hero_sprite)
 
 	var hero_lbl = Label.new()
 	hero_lbl.text = "英雄"
-	hero_lbl.position = Vector2(-355, -70)
-	hero_lbl.add_theme_font_size_override("font_size", 12)
+	hero_lbl.position = Vector2(225, 178)
+	hero_lbl.add_theme_font_size_override("font_size", 13)
 	hero_lbl.add_theme_color_override("font_color", Color.WHITE)
 	add_child(hero_lbl)
 
 	# Enemy sprite
 	var enemy_sprite = ColorRect.new()
 	enemy_sprite.color = Color(0.6, 0.2, 0.6)
-	enemy_sprite.position = Vector2(250, -50)
-	enemy_sprite.size = Vector2(50, 70)
+	enemy_sprite.position = Vector2(920, 200)
+	enemy_sprite.size = Vector2(60, 80)
 	enemy_sprite.name = "EnemySprite"
 	add_child(enemy_sprite)
 
 	enemy_label = Label.new()
 	enemy_label.text = "敌人"
-	enemy_label.position = Vector2(245, -70)
-	enemy_label.add_theme_font_size_override("font_size", 12)
+	enemy_label.position = Vector2(925, 178)
+	enemy_label.add_theme_font_size_override("font_size", 13)
 	enemy_label.add_theme_color_override("font_color", Color.WHITE)
 	add_child(enemy_label)
 
 	# VS
 	var vs_label = Label.new()
 	vs_label.text = "VS"
-	vs_label.position = Vector2(-20, -40)
-	vs_label.add_theme_font_size_override("font_size", 32)
+	vs_label.position = Vector2(600, 210)
+	vs_label.add_theme_font_size_override("font_size", 36)
 	vs_label.add_theme_color_override("font_color", Color(1, 0.8, 0.2))
 	add_child(vs_label)
 
