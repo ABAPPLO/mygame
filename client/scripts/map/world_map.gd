@@ -8,7 +8,7 @@ const AI_DECISION_INTERVAL = 3.0
 var tile_map: Node2D
 var fog_map: Node2D
 var hero_markers: Dictionary = {}
-var monster_data: Dictionary = {}  # key: "x,y" -> monster dict
+var monster_data: Dictionary = {}
 var monster_visuals: Dictionary = {}
 var resource_data: Dictionary = {}
 var resource_visuals: Dictionary = {}
@@ -20,20 +20,27 @@ var ai_timer: float = 0.0
 var ai_busy: bool = false
 var info_label: Label
 var log_label: RichTextLabel
+var status_label: Label
 var camera: Camera2D
 var event_log: Array = []
+var map_loaded: bool = false
 
 
 func _ready():
 	_create_layers()
 	_build_ui()
+	_log_event("正在加载地图...")
+	info_label.text = "正在连接服务器生成地图..."
 	if GameManager.has_map_cache():
 		_restore_map()
+		map_loaded = true
 	else:
-		_generate_map()
+		await _generate_map()
 		_place_map_entities()
+		map_loaded = true
 	_place_heroes()
 	_process_battle_result()
+	_snap_camera_to_hero()
 
 
 func _create_layers():
@@ -43,12 +50,13 @@ func _create_layers():
 
 	fog_map = Node2D.new()
 	fog_map.name = "Fog"
+	fog_map.z_index = 1
 	add_child(fog_map)
 
 	camera = Camera2D.new()
 	camera.zoom = Vector2(2, 2)
 	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 5.0
+	camera.position_smoothing_speed = 8.0
 	add_child(camera)
 
 
@@ -62,11 +70,11 @@ func _build_ui():
 	ui_layer.add_child(ui_root)
 
 	# Top bar
-	var top_panel = Panel.new()
-	top_panel.position = Vector2(0, 0)
-	top_panel.size = Vector2(1280, 40)
-	top_panel.modulate = Color(0, 0, 0, 0.5)
-	ui_root.add_child(top_panel)
+	var top_bar = Panel.new()
+	top_bar.position = Vector2(0, 0)
+	top_bar.size = Vector2(1280, 40)
+	top_bar.modulate = Color(0, 0, 0, 0.7)
+	ui_root.add_child(top_bar)
 
 	var back_btn = Button.new()
 	back_btn.text = "<< 返回城镇"
@@ -77,14 +85,23 @@ func _build_ui():
 
 	info_label = Label.new()
 	info_label.position = Vector2(140, 8)
-	info_label.size = Vector2(600, 28)
+	info_label.size = Vector2(800, 28)
 	info_label.add_theme_font_size_override("font_size", 15)
+	info_label.add_theme_color_override("font_color", Color(1, 0.9, 0.7))
 	ui_root.add_child(info_label)
 
-	# Event log panel at bottom
+	# Status bar (hero position, etc)
+	status_label = Label.new()
+	status_label.position = Vector2(140, 25)
+	status_label.size = Vector2(800, 20)
+	status_label.add_theme_font_size_override("font_size", 12)
+	status_label.add_theme_color_override("font_color", Color(0.6, 0.8, 0.6))
+	ui_root.add_child(status_label)
+
+	# Event log panel
 	var log_panel = Panel.new()
 	log_panel.position = Vector2(0, 520)
-	log_panel.size = Vector2(500, 200)
+	log_panel.size = Vector2(550, 200)
 	log_panel.modulate = Color(0, 0, 0, 0.6)
 	ui_root.add_child(log_panel)
 
@@ -97,7 +114,7 @@ func _build_ui():
 
 	log_label = RichTextLabel.new()
 	log_label.position = Vector2(10, 545)
-	log_label.size = Vector2(480, 170)
+	log_label.size = Vector2(530, 170)
 	log_label.bbcode_enabled = true
 	ui_root.add_child(log_label)
 
@@ -105,11 +122,11 @@ func _build_ui():
 func _generate_map():
 	map_data = await NetworkManager.generate_map()
 	if map_data.has("error"):
-		_log_event("[color=red]地图生成失败[/color]")
+		_log_event("[color=red]地图生成失败: %s[/color]" % str(map_data.error))
+		_log_event("[color=gray]使用本地空地图[/color]")
 		return
 
 	map_seed = map_data.get("seed", 0)
-	info_label.text = "地图种子: %d" % map_seed
 
 	var tiles = map_data.get("tiles", [])
 	for y in range(MAP_SIZE):
@@ -144,15 +161,16 @@ func _generate_map():
 	town_lbl.add_theme_color_override("font_color", Color.WHITE)
 	tile_map.add_child(town_lbl)
 
+	var m_count = map_data.get("monsters", []).size()
+	var r_count = map_data.get("resources", []).size()
+	_log_event("[color=green]地图已加载！种子:%d 怪物:%d 资源:%d[/color]" % [map_seed, m_count, r_count])
+
 
 func _place_map_entities():
 	for m in map_data.get("monsters", []):
 		var key = "%d,%d" % [m.x, m.y]
 		monster_data[key] = m
-		var marker = ColorRect.new()
-		marker.position = Vector2(m.x * TILE_SIZE + 8, m.y * TILE_SIZE + 8)
-		marker.size = Vector2(16, 16)
-		marker.color = Color(1, 0.2, 0.2, 0.9)
+		var marker = _create_monster_visual(m)
 		marker.name = "monster_%s" % key
 		tile_map.add_child(marker)
 		monster_visuals[key] = marker
@@ -160,13 +178,58 @@ func _place_map_entities():
 	for r in map_data.get("resources", []):
 		var key = "%d,%d" % [r.x, r.y]
 		resource_data[key] = r
-		var marker = ColorRect.new()
-		marker.position = Vector2(r.x * TILE_SIZE + 10, r.y * TILE_SIZE + 10)
-		marker.size = Vector2(12, 12)
-		marker.color = Color(1, 0.85, 0.15, 0.9)
+		var marker = _create_resource_visual(r)
 		marker.name = "resource_%s" % key
 		tile_map.add_child(marker)
 		resource_visuals[key] = marker
+
+
+func _create_monster_visual(m: Dictionary) -> Node2D:
+	var container = Node2D.new()
+	container.position = Vector2(m.x * TILE_SIZE, m.y * TILE_SIZE)
+
+	# Red square with black border
+	var border = ColorRect.new()
+	border.position = Vector2(2, 2)
+	border.size = Vector2(TILE_SIZE - 4, TILE_SIZE - 4)
+	border.color = Color(0, 0, 0)
+	container.add_child(border)
+
+	var body = ColorRect.new()
+	body.position = Vector2(4, 4)
+	body.size = Vector2(TILE_SIZE - 8, TILE_SIZE - 8)
+	body.color = Color(1, 0.15, 0.15)
+	container.add_child(body)
+
+	# Monster initial
+	var lbl = Label.new()
+	var name = m.get("name", "?")
+	lbl.text = name.left(1)
+	lbl.position = Vector2(8, 4)
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color.WHITE)
+	container.add_child(lbl)
+
+	return container
+
+
+func _create_resource_visual(r: Dictionary) -> Node2D:
+	var container = Node2D.new()
+	container.position = Vector2(r.x * TILE_SIZE, r.y * TILE_SIZE)
+
+	var diamond = ColorRect.new()
+	diamond.position = Vector2(8, 4)
+	diamond.size = Vector2(16, 16)
+	diamond.color = Color(1, 0.85, 0.1)
+	container.add_child(diamond)
+
+	var diamond2 = ColorRect.new()
+	diamond2.position = Vector2(10, 6)
+	diamond2.size = Vector2(12, 12)
+	diamond2.color = Color(1, 0.95, 0.4)
+	container.add_child(diamond2)
+
+	return container
 
 
 func _place_heroes():
@@ -174,6 +237,14 @@ func _place_heroes():
 		if not hero.in_town:
 			_create_hero_marker(hero)
 			_reveal_around(hero.pos_x, hero.pos_y)
+			_log_event("[color=cyan]%s 出现在地图上 (%d,%d)[/color]" % [hero.name, hero.pos_x, hero.pos_y])
+
+
+func _snap_camera_to_hero():
+	var active = GameManager.get_active_heroes()
+	if active.size() > 0:
+		camera.position = Vector2(active[0].pos_x * TILE_SIZE + TILE_SIZE / 2, active[0].pos_y * TILE_SIZE + TILE_SIZE / 2)
+		camera.position_smoothing_enabled = true
 
 
 func _process_battle_result():
@@ -192,7 +263,6 @@ func _process_battle_result():
 		_log_event("[color=green]%s 战斗胜利！[/color] +%d金 +%d经验" % [
 			hero.name, loot.get("gold", 0), loot.get("exp", 0)
 		])
-		# Re-create hero marker since we're back on map
 		if not hero.in_town:
 			_create_hero_marker(hero)
 	else:
@@ -208,19 +278,47 @@ func _create_hero_marker(hero: Dictionary):
 		old.queue_free()
 		hero_markers.erase(hero.id)
 
-	var marker = ColorRect.new()
-	marker.size = Vector2(20, 20)
-	marker.color = _class_color(hero.hero_class)
-	marker.name = "hero_%s" % hero.id
-	tile_map.add_child(marker)
-	hero_markers[hero.id] = marker
+	var container = Node2D.new()
+	container.name = "hero_%s" % hero.id
 
+	# White border (makes hero easy to spot)
+	var border = ColorRect.new()
+	border.position = Vector2(-2, -2)
+	border.size = Vector2(TILE_SIZE + 4, TILE_SIZE + 4)
+	border.color = Color.WHITE
+	container.add_child(border)
+
+	# Hero body (class color fills most of tile)
+	var body = ColorRect.new()
+	body.position = Vector2(0, 0)
+	body.size = Vector2(TILE_SIZE, TILE_SIZE)
+	body.color = _class_color(hero.hero_class)
+	container.add_child(body)
+
+	# Hero name above
 	var lbl = Label.new()
 	lbl.text = hero.name
-	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.position = Vector2(-10, -15)
+	lbl.add_theme_font_size_override("font_size", 11)
+	lbl.position = Vector2(-5, -16)
 	lbl.add_theme_color_override("font_color", Color.WHITE)
-	marker.add_child(lbl)
+	container.add_child(lbl)
+
+	# HP bar underneath
+	var hp_bg = ColorRect.new()
+	hp_bg.position = Vector2(0, TILE_SIZE + 2)
+	hp_bg.size = Vector2(TILE_SIZE, 4)
+	hp_bg.color = Color(0.2, 0.2, 0.2)
+	container.add_child(hp_bg)
+
+	var hp_bar = ColorRect.new()
+	hp_bar.position = Vector2(0, TILE_SIZE + 2)
+	hp_bar.size = Vector2(TILE_SIZE, 4)
+	hp_bar.color = Color(0.2, 0.8, 0.2)
+	hp_bar.name = "hp_bar"
+	container.add_child(hp_bar)
+
+	tile_map.add_child(container)
+	hero_markers[hero.id] = container
 
 
 func _tile_color(type: String) -> Color:
@@ -234,9 +332,9 @@ func _tile_color(type: String) -> Color:
 
 func _class_color(hero_class: String) -> Color:
 	match hero_class:
-		"战士": return Color(0.9, 0.2, 0.2)
-		"法师": return Color(0.3, 0.4, 0.9)
-		"游侠": return Color(0.2, 0.8, 0.3)
+		"战士": return Color(0.85, 0.15, 0.15)
+		"法师": return Color(0.25, 0.35, 0.9)
+		"游侠": return Color(0.15, 0.75, 0.25)
 		_: return Color(1, 1, 1)
 
 
@@ -255,17 +353,37 @@ func _reveal_around(cx: int, cy: int):
 
 
 func _process(delta):
-	# Update hero marker positions
-	for hero in GameManager.heroes:
-		if not hero.in_town and hero_markers.has(hero.id):
+	if not map_loaded:
+		return
+
+	# Update hero marker positions and HP bars
+	var active = GameManager.get_active_heroes()
+	for hero in active:
+		if hero_markers.has(hero.id):
 			var marker = hero_markers[hero.id]
-			marker.position = Vector2(hero.pos_x * TILE_SIZE + 6, hero.pos_y * TILE_SIZE + 6)
+			marker.position = Vector2(hero.pos_x * TILE_SIZE, hero.pos_y * TILE_SIZE)
 			_reveal_around(hero.pos_x, hero.pos_y)
+			# Update HP bar
+			var hp_bar = marker.get_node_or_null("hp_bar")
+			if hp_bar:
+				var ratio = float(hero.stats.get("hp", 1)) / float(hero.max_hp)
+				hp_bar.size.x = TILE_SIZE * ratio
+				hp_bar.color = Color(0.2, 0.8, 0.2) if ratio > 0.5 else Color(0.9, 0.7, 0.1) if ratio > 0.25 else Color(0.9, 0.15, 0.15)
 
 	# Camera follows first active hero
-	var active = GameManager.get_active_heroes()
 	if active.size() > 0:
-		camera.position = Vector2(active[0].pos_x * TILE_SIZE, active[0].pos_y * TILE_SIZE)
+		camera.position = Vector2(active[0].pos_x * TILE_SIZE + TILE_SIZE / 2, active[0].pos_y * TILE_SIZE + TILE_SIZE / 2)
+
+	# Status text
+	var status_parts = []
+	for hero in active:
+		status_parts.append("%s(%d,%d) HP:%d 兵:%d" % [
+			hero.name, hero.pos_x, hero.pos_y,
+			hero.stats.get("hp", 0), hero.troops
+		])
+	status_label.text = " | ".join(status_parts) + " | 怪物:%d 资源:%d" % [monster_data.size(), resource_data.size()]
+
+	info_label.text = "地图种子:%d | 金:%d 木:%d 石:%d" % [map_seed, ResourceManager.gold, ResourceManager.wood, ResourceManager.stone]
 
 	# AI decision loop
 	if not ai_busy and active.size() > 0:
@@ -285,12 +403,10 @@ func _run_ai_decisions():
 
 
 func _make_hero_decision(hero: Dictionary):
-	# Build context for LLM
 	var nearby_enemies = _scan_nearby(hero.pos_x, hero.pos_y, monster_data, 5)
 	var nearby_resources = _scan_nearby(hero.pos_x, hero.pos_y, resource_data, 5)
 	var visible_summary = _get_visible_summary(hero.pos_x, hero.pos_y)
 	var town_dist = abs(hero.pos_x - 1) + abs(hero.pos_y - 1)
-	var def_key = "def" if hero.stats.has("def") else "defense"
 
 	var request_data = {
 		"hero_id": hero.id,
@@ -314,9 +430,9 @@ func _make_hero_decision(hero: Dictionary):
 	var result = await NetworkManager.ai_explore(request_data)
 
 	if result.has("error"):
-		# Fallback: random move on API failure
-		_log_event("[color=gray]%s 思考中...(fallback)[/color]" % hero.name)
+		_log_event("[color=gray]%s 思考中...(LLM未连接,自动移动)[/color]" % hero.name)
 		_fallback_move(hero)
+		_check_tile_events(hero)
 		return
 
 	_execute_hero_action(hero, result)
@@ -355,7 +471,6 @@ func _get_visible_summary(cx: int, cy: int) -> String:
 
 func _execute_hero_action(hero: Dictionary, decision: Dictionary):
 	var action = decision.get("action", "rest")
-	var reason = decision.get("reason", "")
 
 	match action:
 		"move":
@@ -371,34 +486,24 @@ func _execute_hero_action(hero: Dictionary, decision: Dictionary):
 			var new_x = clampi(hero.pos_x + dx, 0, MAP_SIZE - 1)
 			var new_y = clampi(hero.pos_y + dy, 0, MAP_SIZE - 1)
 
-			# Check if tile is water (impassable)
 			var tile_key = "%d,%d" % [new_x, new_y]
 			if tile_types.get(tile_key, "grass") == "water":
-				_log_event("[color=gray]%s: 前方是水，绕路[/color]" % hero.name)
 				_fallback_move(hero)
+				_check_tile_events(hero)
 				return
 
 			hero.pos_x = new_x
 			hero.pos_y = new_y
 			_log_event("[color=cyan]%s[/color] 向%s移动 (%d,%d)" % [hero.name, direction, new_x, new_y])
-
-			# Check for monster encounter
-			var m_key = "%d,%d" % [new_x, new_y]
-			if monster_data.has(m_key):
-				_trigger_battle(hero, m_key)
-				return
-
-			# Check for resource gathering
-			if resource_data.has(m_key):
-				_gather_resource(hero, m_key)
+			_check_tile_events(hero)
 
 		"attack":
 			var target_pos = decision.get("target", "")
 			if target_pos and monster_data.has(target_pos):
 				_trigger_battle(hero, target_pos)
 			else:
-				# No valid target, move instead
 				_fallback_move(hero)
+				_check_tile_events(hero)
 
 		"gather":
 			var pos_key = "%d,%d" % [hero.pos_x, hero.pos_y]
@@ -423,6 +528,16 @@ func _execute_hero_action(hero: Dictionary, decision: Dictionary):
 
 		_:
 			_fallback_move(hero)
+			_check_tile_events(hero)
+
+
+func _check_tile_events(hero: Dictionary):
+	var pos_key = "%d,%d" % [hero.pos_x, hero.pos_y]
+	if monster_data.has(pos_key):
+		_trigger_battle(hero, pos_key)
+		return
+	if resource_data.has(pos_key):
+		_gather_resource(hero, pos_key)
 
 
 func _fallback_move(hero: Dictionary):
@@ -442,16 +557,12 @@ func _trigger_battle(hero: Dictionary, monster_key: String):
 	var monster = monster_data[monster_key]
 	_log_event("[color=red]!! %s 遭遇了 %s！进入战斗！[/color]" % [hero.name, monster.get("name", "怪物")])
 
-	# Remove monster from map
 	monster_data.erase(monster_key)
 	if monster_visuals.has(monster_key):
 		monster_visuals[monster_key].queue_free()
 		monster_visuals.erase(monster_key)
 
-	# Save map state before leaving
 	_save_map_state()
-
-	# Store battle context and switch scene
 	GameManager.start_battle(hero.id, [monster])
 
 
@@ -462,7 +573,6 @@ func _gather_resource(hero: Dictionary, res_key: String):
 	ResourceManager.add_resource(res_type, amount)
 	_log_event("[color=yellow]%s 采集了 %s x%d[/color]" % [hero.name, res_type, amount])
 
-	# Remove resource from map
 	resource_data.erase(res_key)
 	if resource_visuals.has(res_key):
 		resource_visuals[res_key].queue_free()
@@ -479,7 +589,6 @@ func _log_event(msg: String):
 	for line in event_log:
 		full_text += line + "\n"
 	log_label.text = full_text
-	# Auto-scroll to bottom
 	log_label.scroll_to_line(event_log.size())
 
 
@@ -517,7 +626,6 @@ func _restore_map():
 
 	info_label.text = "地图种子: %d | 继续探索..." % map_seed
 
-	# Rebuild visual tiles from cached tile_types
 	for key in tile_types:
 		var parts = key.split(",")
 		var x = int(parts[0])
@@ -528,19 +636,13 @@ func _restore_map():
 		cell.color = _tile_color(tile_types[key])
 		tile_map.add_child(cell)
 
-	# Restore fog (only reveal previously revealed tiles)
-	for key in tile_types:
-		var parts = key.split(",")
-		var x = int(parts[0])
-		var y = int(parts[1])
 		var fog_cell = ColorRect.new()
 		fog_cell.position = Vector2(x * TILE_SIZE, y * TILE_SIZE)
 		fog_cell.size = Vector2(TILE_SIZE, TILE_SIZE)
 		fog_cell.color = Color(0, 0, 0, 1)
 		fog_cell.name = "fog_%d_%d" % [x, y]
 		fog_map.add_child(fog_cell)
-		var revealed_key = "%d_%d" % [x, y]
-		if revealed.has(revealed_key):
+		if revealed.has("%d_%d" % [x, y]):
 			fog_cell.visible = false
 
 	# Town marker
@@ -551,31 +653,24 @@ func _restore_map():
 	town_marker.color = Color(0.2, 0.7, 0.9)
 	tile_map.add_child(town_marker)
 
-	# Restore monsters
 	for key in monster_data:
 		var m = monster_data[key]
-		var parts = key.split(",")
-		var marker = ColorRect.new()
-		marker.position = Vector2(int(parts[0]) * TILE_SIZE + 8, int(parts[1]) * TILE_SIZE + 8)
-		marker.size = Vector2(16, 16)
-		marker.color = Color(1, 0.2, 0.2, 0.9)
+		var marker = _create_monster_visual(m)
+		marker.name = "monster_%s" % key
 		tile_map.add_child(marker)
 		monster_visuals[key] = marker
 
-	# Restore resources
 	for key in resource_data:
 		var r = resource_data[key]
-		var parts = key.split(",")
-		var marker = ColorRect.new()
-		marker.position = Vector2(int(parts[0]) * TILE_SIZE + 10, int(parts[1]) * TILE_SIZE + 10)
-		marker.size = Vector2(12, 12)
-		marker.color = Color(1, 0.85, 0.15, 0.9)
+		var marker = _create_resource_visual(r)
+		marker.name = "resource_%s" % key
 		tile_map.add_child(marker)
 		resource_visuals[key] = marker
 
-	# Restore event log
 	if log_label:
 		var full_text = ""
 		for line in event_log:
 			full_text += line + "\n"
 		log_label.text = full_text
+
+	_log_event("[color=green]地图已恢复[/color]")
