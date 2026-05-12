@@ -10,7 +10,7 @@ class OllamaProvider(LLMProvider):
         self.model = config.OLLAMA_MODEL
 
     async def generate(self, system_prompt: str, user_prompt: str) -> str:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.post(
                 f"{self.base_url}/api/generate",
                 json={
@@ -27,7 +27,7 @@ class OllamaProvider(LLMProvider):
     async def generate_json(self, system_prompt: str, user_prompt: str) -> dict:
         json_instruction = "You MUST respond with valid JSON only. No markdown, no explanation."
         full_prompt = f"{system_prompt}\n{json_instruction}\n\n{user_prompt}"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.post(
                 f"{self.base_url}/api/generate",
                 json={

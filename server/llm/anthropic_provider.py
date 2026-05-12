@@ -6,7 +6,10 @@ from ..config import config
 
 class AnthropicProvider(LLMProvider):
     def __init__(self):
-        self.client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+        kwargs = {"api_key": config.ANTHROPIC_API_KEY}
+        if config.ANTHROPIC_BASE_URL:
+            kwargs["base_url"] = config.ANTHROPIC_BASE_URL
+        self.client = anthropic.AsyncAnthropic(**kwargs)
         self.model = config.ANTHROPIC_MODEL
 
     async def generate(self, system_prompt: str, user_prompt: str) -> str:

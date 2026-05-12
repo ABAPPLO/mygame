@@ -429,8 +429,9 @@ func _make_hero_decision(hero: Dictionary):
 
 	var result = await NetworkManager.ai_explore(request_data)
 
-	if result.has("error"):
-		_log_event("[color=gray]%s 思考中...(LLM未连接,自动移动)[/color]" % hero.name)
+	if result.has("error") or result.has("detail") or not result.has("action"):
+		var err_msg = str(result.get("error", result.get("detail", "未知错误")))
+		_log_event("[color=gray]%s LLM未响应,自动移动 (%s)[/color]" % [hero.name, err_msg.left(30)])
 		_fallback_move(hero)
 		_check_tile_events(hero)
 		return
