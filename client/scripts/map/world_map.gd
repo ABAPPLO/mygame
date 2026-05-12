@@ -3,7 +3,7 @@ extends Node2D
 const TILE_SIZE = 32
 const MAP_SIZE = 32
 const VIEW_RADIUS = 4
-const AI_DECISION_INTERVAL = 3.0
+const AI_DECISION_INTERVAL = 0.5
 
 var tile_map: Node2D
 var fog_map: Node2D
