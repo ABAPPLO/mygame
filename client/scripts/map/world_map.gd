@@ -484,14 +484,18 @@ func _execute_hero_action(hero: Dictionary, decision: Dictionary):
 				"east": dx = 1
 				"west": dx = -1
 				_: dy = -1
-			var new_x = clampi(hero.pos_x + dx, 0, MAP_SIZE - 1)
-			var new_y = clampi(hero.pos_y + dy, 0, MAP_SIZE - 1)
+			var new_x = clampi(hero.pos_x + dx * 3, 0, MAP_SIZE - 1)
+			var new_y = clampi(hero.pos_y + dy * 3, 0, MAP_SIZE - 1)
 
-			var tile_key = "%d,%d" % [new_x, new_y]
-			if tile_types.get(tile_key, "grass") == "water":
-				_fallback_move(hero)
-				_check_tile_events(hero)
-				return
+			# Walk 3 tiles in direction, stop at water or map edge
+			for step in range(3):
+				var try_x = clampi(hero.pos_x + dx * (step + 1), 0, MAP_SIZE - 1)
+				var try_y = clampi(hero.pos_y + dy * (step + 1), 0, MAP_SIZE - 1)
+				var tile_key = "%d,%d" % [try_x, try_y]
+				if tile_types.get(tile_key, "grass") == "water":
+					break
+				new_x = try_x
+				new_y = try_y
 
 			hero.pos_x = new_x
 			hero.pos_y = new_y
@@ -545,13 +549,20 @@ func _fallback_move(hero: Dictionary):
 	var directions = [[0, -1], [0, 1], [-1, 0], [1, 0]]
 	directions.shuffle()
 	for d in directions:
-		var nx = clampi(hero.pos_x + d[0], 0, MAP_SIZE - 1)
-		var ny = clampi(hero.pos_y + d[1], 0, MAP_SIZE - 1)
-		var key = "%d,%d" % [nx, ny]
-		if tile_types.get(key, "grass") != "water":
-			hero.pos_x = nx
-			hero.pos_y = ny
-			return
+		var nx = clampi(hero.pos_x + d[0] * 3, 0, MAP_SIZE - 1)
+		var ny = clampi(hero.pos_y + d[1] * 3, 0, MAP_SIZE - 1)
+		# Walk up to 3 tiles, stop at water
+		for step in range(3):
+			var try_x = clampi(hero.pos_x + d[0] * (step + 1), 0, MAP_SIZE - 1)
+			var try_y = clampi(hero.pos_y + d[1] * (step + 1), 0, MAP_SIZE - 1)
+			var key = "%d,%d" % [try_x, try_y]
+			if tile_types.get(key, "grass") == "water":
+				break
+			nx = try_x
+			ny = try_y
+		hero.pos_x = nx
+		hero.pos_y = ny
+		return
 
 
 func _trigger_battle(hero: Dictionary, monster_key: String):
