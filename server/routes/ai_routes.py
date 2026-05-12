@@ -20,6 +20,9 @@ async def explore_decision(req: ExplorationRequest):
         troops=req.troops,
         talent_name=req.talent_name,
         talent_desc=req.talent_desc,
+        suggested_target=req.suggested_target,
+        suggested_action=req.suggested_action,
+        suggested_direction=req.suggested_direction,
     )
     user_prompt = EXPLORATION_USER.format(
         x=req.x,

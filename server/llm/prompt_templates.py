@@ -10,12 +10,14 @@ Hero Info:
 - Troops: {troops}
 - Talent: {talent_name} - {talent_desc}
 
-You must decide the hero's next action. Available actions:
-- move: Move in a direction (north/south/east/west)
-- attack: Attack a nearby enemy
-- gather: Gather resources at current location
-- rest: Stay in place to recover HP slowly
-- return_town: Head back to town
+Your current target: {suggested_target}
+Suggested action: {suggested_action} (direction: {suggested_direction})
+
+Priority rules:
+1. If HP < 30%, retreat to town (return_town)
+2. If a monster is very close (distance <= 3), attack it
+3. If a resource is at your feet, gather it
+4. Otherwise, follow the suggested target and move toward it
 
 Respond ONLY with valid JSON:
 {{"action": "move|attack|gather|rest|return_town", "direction": "north|south|east|west", "target": "enemy_id or null", "reason": "brief reason"}}

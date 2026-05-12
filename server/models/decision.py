@@ -19,6 +19,9 @@ class ExplorationRequest(BaseModel):
     nearby_enemies: str
     nearby_resources: str
     town_distance: int
+    suggested_target: str = ""
+    suggested_action: str = ""
+    suggested_direction: str = ""
 
 
 class ExplorationDecision(BaseModel):

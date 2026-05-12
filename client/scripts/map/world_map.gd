@@ -403,10 +403,16 @@ func _run_ai_decisions():
 
 
 func _make_hero_decision(hero: Dictionary):
-	var nearby_enemies = _scan_nearby(hero.pos_x, hero.pos_y, monster_data, 5)
-	var nearby_resources = _scan_nearby(hero.pos_x, hero.pos_y, resource_data, 5)
+	var nearby_enemies = _scan_nearby(hero.pos_x, hero.pos_y, monster_data, 8)
+	var nearby_resources = _scan_nearby(hero.pos_x, hero.pos_y, resource_data, 8)
 	var visible_summary = _get_visible_summary(hero.pos_x, hero.pos_y)
 	var town_dist = abs(hero.pos_x - 1) + abs(hero.pos_y - 1)
+
+	# === Target System ===
+	var target = _pick_target(hero)
+	var suggested_action = target.action
+	var suggested_direction = target.direction
+	var suggested_target_desc = target.description
 
 	var request_data = {
 		"hero_id": hero.id,
@@ -425,18 +431,162 @@ func _make_hero_decision(hero: Dictionary):
 		"nearby_enemies": nearby_enemies,
 		"nearby_resources": nearby_resources,
 		"town_distance": town_dist,
+		"suggested_target": suggested_target_desc,
+		"suggested_action": suggested_action,
+		"suggested_direction": suggested_direction,
 	}
 
 	var result = await NetworkManager.ai_explore(request_data)
 
 	if result.has("error") or result.has("detail") or not result.has("action"):
-		var err_msg = str(result.get("error", result.get("detail", "未知错误")))
-		_log_event("[color=gray]%s LLM未响应,自动移动 (%s)[/color]" % [hero.name, err_msg.left(30)])
-		_fallback_move(hero)
+		# Fallback: follow target directly
+		_log_event("[color=gray]%s LLM未响应,走向%s[/color]" % [hero.name, suggested_target_desc])
+		_move_toward(hero, target.tx, target.ty)
 		_check_tile_events(hero)
 		return
 
 	_execute_hero_action(hero, result)
+
+
+func _pick_target(hero: Dictionary) -> Dictionary:
+	var hp_ratio = float(hero.stats.get("hp", 0)) / float(hero.max_hp)
+	var hx = hero.pos_x
+	var hy = hero.pos_y
+
+	# === Priority 1: Low HP → Return to town ===
+	if hp_ratio < 0.3:
+		return {
+			"action": "return_town",
+			"direction": _direction_to(hx, hy, 1, 1),
+			"description": "返回城镇(低血量撤退)",
+			"tx": 1,
+			"ty": 1,
+		}
+
+	# === Priority 2: Very close monster (distance <= 3) → Attack ===
+	var closest_monster = _find_closest(hx, hy, monster_data)
+	if closest_monster.found and closest_monster.dist <= 3:
+		return {
+			"action": "attack",
+			"direction": _direction_to(hx, hy, closest_monster.x, closest_monster.y),
+			"description": "攻击%s(距离%d)" % [closest_monster.name, closest_monster.dist],
+			"tx": closest_monster.x,
+			"ty": closest_monster.y,
+		}
+
+	# === Priority 3: Resource at feet → Gather ===
+	var feet_key = "%d,%d" % [hx, hy]
+	if resource_data.has(feet_key):
+		return {
+			"action": "gather",
+			"direction": "",
+			"description": "采集脚下资源",
+			"tx": hx,
+			"ty": hy,
+		}
+
+	# === Priority 4: Good HP + troops → Hunt nearest monster ===
+	if hp_ratio > 0.6 and hero.troops > 0 and closest_monster.found:
+		return {
+			"action": "move",
+			"direction": _direction_to(hx, hy, closest_monster.x, closest_monster.y),
+			"description": "猎杀%s(距离%d)" % [closest_monster.name, closest_monster.dist],
+			"tx": closest_monster.x,
+			"ty": closest_monster.y,
+		}
+
+	# === Priority 5: Go to nearest resource ===
+	var closest_resource = _find_closest(hx, hy, resource_data)
+	if closest_resource.found:
+		return {
+			"action": "move",
+			"direction": _direction_to(hx, hy, closest_resource.x, closest_resource.y),
+			"description": "采集%s(距离%d)" % [closest_resource.name, closest_resource.dist],
+			"tx": closest_resource.x,
+			"ty": closest_resource.y,
+		}
+
+	# === Priority 6: Explore unexplored area ===
+	var explore_dir = _pick_explore_direction(hx, hy)
+	return {
+		"action": "move",
+		"direction": explore_dir,
+		"description": "探索未知区域",
+		"tx": hx + (3 if explore_dir == "east" else -3 if explore_dir == "west" else 0),
+		"ty": hy + (3 if explore_dir == "south" else -3 if explore_dir == "north" else 0),
+	}
+
+
+func _find_closest(cx: int, cy: int, data: Dictionary) -> Dictionary:
+	var best = {"found": false, "x": 0, "y": 0, "dist": 999, "name": ""}
+	for key in data:
+		var parts = key.split(",")
+		var x = int(parts[0])
+		var y = int(parts[1])
+		var dist = abs(x - cx) + abs(y - cy)
+		if dist < best.dist:
+			best = {
+				"found": true,
+				"x": x,
+				"y": y,
+				"dist": dist,
+				"name": data[key].get("name", data[key].get("type", "?")),
+			}
+	return best
+
+
+func _direction_to(from_x: int, from_y: int, to_x: int, to_y: int) -> String:
+	var dx = to_x - from_x
+	var dy = to_y - from_y
+	# Pick the axis with greater distance
+	if abs(dx) >= abs(dy):
+		return "east" if dx > 0 else "west"
+	else:
+		return "south" if dy > 0 else "north"
+
+
+func _pick_explore_direction(cx: int, cy: int) -> String:
+	# Count revealed tiles in each direction to find least explored
+	var scores = {"north": 0, "south": 0, "east": 0, "west": 0}
+	for dx in range(1, 8):
+		for dy in range(-3, 4):
+			if revealed.has("%d_%d" % [cx + dx, cy + dy]): scores.east += 1
+			if revealed.has("%d_%d" % [cx - dx, cy + dy]): scores.west += 1
+			if revealed.has("%d_%d" % [cx + dy, cy + dy]): scores.south += 1
+			if revealed.has("%d_%d" % [cx + dy, cy - dy]): scores.north += 1
+	# Pick direction with fewest revealed tiles (most unexplored)
+	var best_dir = "north"
+	var best_score = 999
+	for dir in scores:
+		if scores[dir] < best_score:
+			best_score = scores[dir]
+			best_dir = dir
+	return best_dir
+
+
+func _move_toward(hero: Dictionary, tx: int, ty: int):
+	if hero.pos_x == tx and hero.pos_y == ty:
+		return
+	var dir = _direction_to(hero.pos_x, hero.pos_y, tx, ty)
+	var dx = 0
+	var dy = 0
+	match dir:
+		"north": dy = -1
+		"south": dy = 1
+		"east": dx = 1
+		"west": dx = -1
+	var nx = hero.pos_x
+	var ny = hero.pos_y
+	for step in range(3):
+		var try_x = clampi(nx + dx, 0, MAP_SIZE - 1)
+		var try_y = clampi(ny + dy, 0, MAP_SIZE - 1)
+		var key = "%d,%d" % [try_x, try_y]
+		if tile_types.get(key, "grass") == "water":
+			break
+		nx = try_x
+		ny = try_y
+	hero.pos_x = nx
+	hero.pos_y = ny
 
 
 func _scan_nearby(cx: int, cy: int, data: Dictionary, radius: int) -> String:
